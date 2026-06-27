@@ -85,7 +85,7 @@ echo "  This script will verify that the network on your K8s nodes is"
 echo "  configured correctly before kubeadm is installed."
 echo ""
 if [[ -n "$CHECK_ONLY" ]]; then
-  echo "  ${BLD}Mode:${NC} Running single check only: ${CYN}${CHECK_ONLY}${NC}"
+  echo -e "  ${BLD}Mode:${NC} Running single check only: ${CYN}${CHECK_ONLY}${NC}"
   echo ""
 fi
 read -rp "  Press ENTER to begin, or Ctrl+C to exit: " _
