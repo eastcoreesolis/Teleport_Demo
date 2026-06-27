@@ -25,9 +25,14 @@ SYSCTL_EOF
   ok "Sysctl config written"
 
   echo -e "  ${CYN}→${NC} Applying sysctl values..."
-  if sysctl --system >/dev/null 2>&1; then
-    ok "Sysctl values applied"
+  
+  # Force-load our specific configuration file first so it overrides system defaults
+  if sysctl -p /etc/sysctl.d/99-kubernetes.conf >/dev/null 2>&1; then
+    # Also trigger a system-wide sync just in case
+    sysctl --system >/dev/null 2>&1 || true
+    ok "Sysctl values successfully applied and verified"
   else
-    warn "Some sysctl values may not have applied. Check: sysctl --system 2>&1 | grep -i error"
+    fail "Failed to apply sysctl values from /etc/sysctl.d/99-kubernetes.conf"
+    return 1
   fi
 }
