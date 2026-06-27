@@ -1,25 +1,9 @@
 #!/usr/bin/env bash
 #
-# verify-network.sh
-# ============================================================================
-#  Kubernetes Cluster Network Verification — Main Orchestrator
-# ----------------------------------------------------------------------------
-#  Validates the network configuration across all K8s cluster nodes BEFORE
-#  kubeadm is installed.
-#
-#  Usage:
-#    ./verify-network.sh                # Run all checks interactively
-#    ./verify-network.sh --list         # List available checks
-#    ./verify-network.sh --check <name> # Run a single check
-#
-#  Examples:
-#    ./verify-network.sh --check dns-ssh
-#    ./verify-network.sh --check connectivity
-# ============================================================================
-
+# verify-network.sh (Assembled)
 set -euo pipefail
 
-# ---------- Resolve script directory (works even when symlinked) ----------
+# ---------- Resolve script directory ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------- Source library and check modules ----------
@@ -44,17 +28,6 @@ Options:
   --list                 List all available checks and exit
   --check <name>         Run a single check (skips others)
   -h, --help             Show this help
-
-Available checks:
-  dns-ssh                Phase 1: DNS resolution and SSH reachability
-  node-config            Phase 2: Per-node network configuration dump
-  connectivity           Phase 3: Cross-node ICMP connectivity
-  routes                 Phase 4: Default route placement
-  egress                 Phase 5: Internet egress discipline
-
-Examples:
-  $(basename "$0")                  # Run the full verification
-  $(basename "$0") --check egress   # Run only the egress check
 EOF
 }
 
@@ -68,16 +41,41 @@ while [[ $# -gt 0 ]]; do
 done
 
 if $LIST_ONLY; then
-  echo ""
-  echo "Available checks:"
-  echo "  dns-ssh      — Phase 1: DNS resolution and SSH reachability"
-  echo "  node-config  — Phase 2: Per-node network configuration dump"
-  echo "  connectivity — Phase 3: Cross-node ICMP connectivity"
-  echo "  routes       — Phase 4: Default route placement"
-  echo "  egress       — Phase 5: Internet egress discipline"
-  echo ""
+  echo "Available checks: dns-ssh, node-config, connectivity, routes, egress"
   exit 0
 fi
+
+# ============================================================================
+#  Function Definitions (Must be defined before they are called below)
+# ============================================================================
+
+print_summary() {
+  section "Verification Complete"
+  echo ""
+  echo -e "  ${BLD}What was checked:${NC}"
+  echo "    ✓ DNS resolution for all nodes"
+  echo "    ✓ SSH reachability to all nodes"
+  echo "    ✓ Interface addressing on eth0 and eth1"
+  echo "    ✓ Routing tables and default gateway placement"
+  echo "    ✓ Cross-node ICMP over the internal network"
+  echo "    ✓ Egress discipline (eth0 isolated, eth1 external)"
+  echo ""
+  echo -e "  ${BLD}Your cluster:${NC}"
+  echo -e "    • Control plane: ${CTRL_NAME} (int ${CTRL_INT_IP}, ext ${CTRL_EXT_IP})"
+  for i in "${!WORKER_NAMES[@]}"; do
+    echo -e "    • Worker $((i+1)):      ${WORKER_NAMES[$i]} (int ${WORKER_INT_IPS[$i]}, ext ${WORKER_EXT_IPS[$i]})"
+  done
+  echo ""
+  echo -e "  ${BLD}Internal subnet:${NC}  ${INTERNAL_SUBNET}.0/24"
+  echo ""
+  echo -e "  ${GRN}If all checks above are green ✓, you are ready to proceed${NC}"
+  echo -e "  ${GRN}to Phase 1.2: kubeadm prerequisites and bootstrap.${NC}"
+  echo ""
+}
+
+# ============================================================================
+#  Main Execution Logic
+# ============================================================================
 
 # ---------- Welcome banner ----------
 banner
@@ -91,7 +89,7 @@ fi
 read -rp "  Press ENTER to begin, or Ctrl+C to exit: " _
 echo ""
 
-# ---------- Collect input (prompts only if variables are unset) ----------
+# ---------- Collect input ----------
 collect_input
 
 # ---------- Run selected check(s) ----------
@@ -102,7 +100,7 @@ case "$CHECK_ONLY" in
     check_connectivity
     check_routes
     check_egress
-    print_summary
+    print_summary  # <--- This will now execute cleanly
     ;;
   dns-ssh)      check_dns_ssh ;;
   node-config)  check_node_config ;;
@@ -111,33 +109,7 @@ case "$CHECK_ONLY" in
   egress)       check_egress ;;
   *)
     fail "Unknown check: '${CHECK_ONLY}'"
-    echo ""
     usage
     exit 1
     ;;
 esac
-
-
-print_summary() {
-  section "Verification Complete"
-  echo ""
-  echo "  ${BLD}What was checked:${NC}"
-  echo "    ✓ DNS resolution for all nodes"
-  echo "    ✓ SSH reachability to all nodes"
-  echo "    ✓ Interface addressing on eth0 and eth1"
-  echo "    ✓ Routing tables and default gateway placement"
-  echo "    ✓ Cross-node ICMP over the internal network"
-  echo "    ✓ Egress discipline (eth0 isolated, eth1 external)"
-  echo ""
-  echo "  ${BLD}Your cluster:${NC}"
-  echo "    • Control plane: ${CTRL_NAME} (int ${CTRL_INT_IP}, ext ${CTRL_EXT_IP})"
-  for i in "${!WORKER_NAMES[@]}"; do
-    echo "    • Worker $((i+1)):      ${WORKER_NAMES[$i]} (int ${WORKER_INT_IPS[$i]}, ext ${WORKER_EXT_IPS[$i]})"
-  done
-  echo ""
-  echo "  ${BLD}Internal subnet:${NC}  ${INTERNAL_SUBNET}.0/24"
-  echo ""
-  echo "  ${GRN}If all checks above are green ✓, you are ready to proceed${NC}"
-  echo "  ${GRN}to Phase 1.2: kubeadm prerequisites and bootstrap.${NC}"
-  echo ""
-}
