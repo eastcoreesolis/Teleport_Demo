@@ -47,7 +47,7 @@ collect_input() {
   echo "    • Otherwise, enter the path to the SSH private key:"
   echo ""
 
- # Detect the real user's home directory even if running under sudo
+  # Detect the real user's home directory even if running under sudo
   local REAL_HOME
   if [[ -n "${SUDO_USER:-}" ]]; then
     REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
@@ -55,9 +55,17 @@ collect_input() {
     REAL_HOME="$HOME"
   fi
 
+  # Determine the best default SSH key (check for id_ed25519 first, then fallback to id_rsa)
+  local default_key_name="id_rsa"
+  local default_key_path="${REAL_HOME}/.ssh/id_rsa"
+  if [[ -f "${REAL_HOME}/.ssh/id_ed25519" ]]; then
+    default_key_name="id_ed25519"
+    default_key_path="${REAL_HOME}/.ssh/id_ed25519"
+  fi
+
   while true; do
-    read -rp "  SSH private key path [~/.ssh/id_rsa]: " SSH_KEY
-    SSH_KEY=${SSH_KEY:-~/.ssh/id_rsa}
+    read -rp "  SSH private key path [~/.ssh/${default_key_name}]: " SSH_KEY
+    SSH_KEY=${SSH_KEY:-~/.ssh/${default_key_name}}
 
     # Safely expand ~ or ~/.ssh to the real user's home directory
     SSH_KEY="${SSH_KEY/#\~/$REAL_HOME}"
