@@ -3,21 +3,52 @@
 #  Post-apply verification: confirms the configuration took effect.
 # ============================================================================
 
+TMP_IP_FILE=$(mktemp /tmp/verify_ip.XXXXXX)
+TMP_ROUTE_FILE=$(mktemp /tmp/verify_route.XXXXXX)
+
+# Safely query an interface IP using a file redirect instead of pipes
+get_interface_ip() {
+  local iface="$1"
+  # Use a fresh redirect instead of pipes. Redirects do not trigger SIGPIPE.
+  ip -4 addr show dev "$iface" 2>/dev/null > "$TMP_IP_FILE" || true
+
+  # Process the file
+  awk '/inet / {print $2}' "$TMP_IP_FILE" | cut -d/ -f1 | head -n1
+}
+
+# Safely query the default route using a file redirect
+get_default_route() {
+  ip route show default 2>/dev/null > "$TMP_ROUTE_FILE" || true
+  head -n1 "$TMP_ROUTE_FILE"
+}
+
+# Cleanup on exit
+cleanup_tmp_files() {
+  rm -f "$TMP_IP_FILE" "$TMP_ROUTE_FILE"
+}
+trap cleanup_tmp_files EXIT
+
 wait_for_network() {
   echo ""
   echo -e "  ${CYN}→${NC} Waiting for network to converge (up to 15 seconds)..."
+
   local waited=0
+  local int_ip=""
+  local ext_ip=""
+
   while (( waited < 15 )); do
-    if [[ -n "$(ip -4 addr show dev "$INTERNAL_IFACE" 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n1)" ]] \
-       && [[ -n "$(ip -4 addr show dev "$EXTERNAL_IFACE" 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n1)" ]]; then
-      ok "Network interfaces are up"
-      sleep 2  # Let routing settle fully
+    int_ip=$(get_interface_ip "$INTERNAL_IFACE")
+    ext_ip=$(get_interface_ip "$EXTERNAL_IFACE")
+
+    if [[ -n "$int_ip" && -n "$ext_ip" ]]; then
+      ok "Network interfaces are up (Internal: $int_ip, External: $ext_ip)"
+      sleep 2  # Let routing table settle fully
       return 0
     fi
     sleep 1
     ((waited++))
   done
-  warn "Network did not converge within 15 seconds. Continuing checks anyway."
+  warn "Network did not fully converge within 15 seconds. Continuing checks anyway."
 }
 
 verify_local_config() {
@@ -29,7 +60,7 @@ verify_local_config() {
 
   # 1. Verify Internal Interface IP
   local int_actual=""
-  int_actual=$(ip -4 addr show dev "$INTERNAL_IFACE" 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n1 || true)
+  int_actual=$(get_interface_ip "$INTERNAL_IFACE")
   if [[ "$int_actual" == "$THIS_INT_IP" ]]; then
     ok "${INTERNAL_IFACE} IP: $int_actual"
   else
@@ -38,7 +69,7 @@ verify_local_config() {
 
   # 2. Verify External Interface IP
   local ext_actual=""
-  ext_actual=$(ip -4 addr show dev "$EXTERNAL_IFACE" 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n1 || true)
+  ext_actual=$(get_interface_ip "$EXTERNAL_IFACE")
   if [[ "$ext_actual" == "$THIS_EXT_IP" ]]; then
     ok "${EXTERNAL_IFACE} IP: $ext_actual"
   else
@@ -47,7 +78,7 @@ verify_local_config() {
 
   # 3. Verify Default Route
   local route_actual=""
-  route_actual=$(ip route show 2>/dev/null | grep "^default" | head -n1 || true)
+  route_actual=$(get_default_route)
   if echo "$route_actual" | grep -qF "via ${THIS_GATEWAY} dev ${EXTERNAL_IFACE}"; then
     ok "default route: $route_actual"
   else
@@ -56,7 +87,7 @@ verify_local_config() {
 
   # 4. Verify Sysctl settings
   local rp_all="" rp_int="" rp_ext="" ip_fwd=""
-  
+
   rp_all=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null || echo "0")
   [[ "$rp_all" == "1" ]] && ok "net.ipv4.conf.all.rp_filter: $rp_all" || fail "rp_filter all: got '${rp_all:-EMPTY}'"
 
