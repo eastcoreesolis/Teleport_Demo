@@ -5,10 +5,11 @@ set -euo pipefail
 
 # ---------- Resolve script directory ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARED_LIB="${SCRIPT_DIR}/../lib"
 
 # ---------- Source library and check modules ----------
-source "${SCRIPT_DIR}/lib/ui.sh"
-source "${SCRIPT_DIR}/lib/ssh-utils.sh"
+source "${SHARED_LIB}/ui.sh"
+source "${SHARED_LIB}/ssh-utils.sh"
 source "${SCRIPT_DIR}/collect-input.sh"
 source "${SCRIPT_DIR}/check-dns-ssh.sh"
 source "${SCRIPT_DIR}/check-node-config.sh"
