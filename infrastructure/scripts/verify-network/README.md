@@ -1,6 +1,6 @@
 # verify-network
 
-Validates the network configuration of the 3 K8s cluster nodes **before**
+Validates the network configuration of the K8s cluster nodes **before**
 kubeadm is installed. Confirms that:
 
 - All nodes are reachable via SSH
@@ -12,7 +12,6 @@ kubeadm is installed. Confirms that:
 
 ## Usage
 
-```bash
 # Run the full verification (interactive)
 ./verify-network.sh
 
