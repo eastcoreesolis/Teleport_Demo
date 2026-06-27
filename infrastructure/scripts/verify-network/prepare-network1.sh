@@ -7,17 +7,11 @@
 #  This script MUST be run on EACH of the 3 nodes before verify-network.sh
 #  is run from the control plane.
 #
-#  What it does:
-#    1. Writes a deterministic netplan configuration for dual-NIC setup
-#       (eth0 = cluster-internal, eth1 = corporate-external)
-#    2. Masks cloud-init network management (prevents overwrites on reboot)
-#    3. Applies the K8s-required sysctl values (rp_filter, IP forwarding)
-#    4. Adds cluster peer entries to /etc/hosts (DNS fallback)
-#    5. Restarts systemd-networkd to apply the netplan
-#
-#  Usage:
-#    sudo ./prepare-network.sh
-#    (You will be prompted for the host's role, IPs, and peer nodes)
+#  Features:
+#    • Auto-detects node role based on hostname
+#    • Automatically calculates matching default IPs, gateways, and DNS
+#    • Dynamically sets up host peer mappings based on role
+#    • Allows complete pass-through configuration by pressing ENTER
 # ============================================================================
 
 set -euo pipefail
@@ -34,18 +28,53 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# ---------- Auto-Detect Topology Defaults ----------
+CURRENT_HOSTNAME=$(hostname)
+DEFAULT_GATEWAY="192.168.1.254"
+DEFAULT_DNS="192.168.1.70,192.168.1.254"
+DEFAULT_SEARCH="eastcore.local"
+
+# Calculate contextual defaults based on hostname
+if [[ "$CURRENT_HOSTNAME" =~ (control|master) ]]; then
+  DEFAULT_THIS_HOSTNAME="kcontrolplane"
+  DEFAULT_INT_IP="192.168.2.85"
+  DEFAULT_EXT_IP="192.168.1.85"
+  DEFAULT_PEER_COUNT=2
+  DEFAULT_PEER_NAMES=("kworkera" "kworkerb")
+  DEFAULT_PEER_IPS=("192.168.2.86" "192.168.2.87")
+elif [[ "$CURRENT_HOSTNAME" =~ (workera|worker1|worker-a) ]]; then
+  DEFAULT_THIS_HOSTNAME="kworkera"
+  DEFAULT_INT_IP="192.168.2.86"
+  DEFAULT_EXT_IP="192.168.1.86"
+  DEFAULT_PEER_COUNT=2
+  DEFAULT_PEER_NAMES=("kcontrolplane" "kworkerb")
+  DEFAULT_PEER_IPS=("192.168.2.85" "192.168.2.87")
+elif [[ "$CURRENT_HOSTNAME" =~ (workerb|worker2|worker-b) ]]; then
+  DEFAULT_THIS_HOSTNAME="kworkerb"
+  DEFAULT_INT_IP="192.168.2.87"
+  DEFAULT_EXT_IP="192.168.1.87"
+  DEFAULT_PEER_COUNT=2
+  DEFAULT_PEER_NAMES=("kcontrolplane" "kworkera")
+  DEFAULT_PEER_IPS=("192.168.2.85" "192.168.2.86")
+else
+  # Generic fallbacks if hostname is completely custom
+  DEFAULT_THIS_HOSTNAME="$CURRENT_HOSTNAME"
+  DEFAULT_INT_IP="192.168.2.85"
+  DEFAULT_EXT_IP="192.168.1.85"
+  DEFAULT_PEER_COUNT=2
+  DEFAULT_PEER_NAMES=("kworkera" "kworkerb")
+  DEFAULT_PEER_IPS=("192.168.2.86" "192.168.2.87")
+fi
+
 # ---------- Welcome ----------
 banner
-echo "  This script prepares a single K8s node's network configuration"
-echo "  for cluster use. Run it on EACH of the 3 nodes before running"
-echo "  verify-network.sh from the control plane."
+echo "  This script prepares a single K8s node's network configuration."
+echo "  It has auto-detected your node's identity and loaded standard defaults."
+echo "  If you are following the reference design, simply press ENTER at"
+echo "  each prompt to accept the pre-calculated default values."
 echo ""
-echo -e "  ${BLD}What this script will do:${NC}"
-echo "    1. Write a deterministic netplan for dual-NIC (eth0=internal, eth1=external)"
-echo "    2. Mask cloud-init network management to prevent overwrites on reboot"
-echo "    3. Apply K8s-required sysctl values (rp_filter, IP forwarding)"
-echo "    4. Add cluster peer entries to /etc/hosts as a DNS fallback"
-echo "    5. Apply all changes immediately (no reboot required)"
+echo -e "  ${BLD}Detected Hostname:${NC} ${CURRENT_HOSTNAME}"
+echo -e "  ${BLD}Assigned Role:${NC}     ${DEFAULT_THIS_HOSTNAME}"
 echo ""
 read -rp "  Press ENTER to begin, or Ctrl+C to exit: " _
 echo ""
@@ -53,64 +82,56 @@ echo ""
 # ---------- Step 1: Node role and IP configuration ----------
 section "Step 1 of 4 — Node Identity and IP Configuration"
 echo ""
-echo "  Tell us about THIS node (the one you're running this script on)."
-echo ""
 
 # Hostname
-while true; do
-  default_hostname=$(hostname)
-  read -rp "  This node's hostname [${default_hostname}]: " THIS_HOSTNAME
-  THIS_HOSTNAME=${THIS_HOSTNAME:-$default_hostname}
-  [[ -n "$THIS_HOSTNAME" ]] && break
-  fail "Hostname cannot be empty."
-done
-ok "This node: ${BLD}${THIS_HOSTNAME}${NC}"
+read -rp "  This node's hostname [${DEFAULT_THIS_HOSTNAME}]: " THIS_HOSTNAME
+THIS_HOSTNAME=${THIS_HOSTNAME:-$DEFAULT_THIS_HOSTNAME}
+ok "Hostname: ${BLD}${THIS_HOSTNAME}${NC}"
 
 # Internal IP
 while true; do
-  read -rp "  This node's INTERNAL IP (eth0, e.g., 192.168.2.85): " THIS_INT_IP
+  read -rp "  INTERNAL IP (eth0) [${DEFAULT_INT_IP}]: " THIS_INT_IP
+  THIS_INT_IP=${THIS_INT_IP:-$DEFAULT_INT_IP}
   if is_valid_ip "$THIS_INT_IP"; then
     break
   else
-    fail "'${THIS_INT_IP}' is not a valid IPv4 address."
+    fail "'${THIS_INT_IP}' is not a valid IPv4 address. Please try again."
   fi
 done
 ok "Internal IP: ${BLD}${THIS_INT_IP}${NC}"
 
 # External IP
 while true; do
-  read -rp "  This node's EXTERNAL IP (eth1, e.g., 192.168.1.85): " THIS_EXT_IP
+  read -rp "  EXTERNAL IP (eth1) [${DEFAULT_EXT_IP}]: " THIS_EXT_IP
+  THIS_EXT_IP=${THIS_EXT_IP:-$DEFAULT_EXT_IP}
   if is_valid_ip "$THIS_EXT_IP"; then
     break
   else
-    fail "'${THIS_EXT_IP}' is not a valid IPv4 address."
+    fail "'${THIS_EXT_IP}' is not a valid IPv4 address. Please try again."
   fi
 done
 ok "External IP: ${BLD}${THIS_EXT_IP}${NC}"
 
 # Default gateway (for eth1)
 while true; do
-  read -rp "  External default gateway (e.g., 192.168.1.254): " THIS_GATEWAY
+  read -rp "  External default gateway [${DEFAULT_GATEWAY}]: " THIS_GATEWAY
+  THIS_GATEWAY=${THIS_GATEWAY:-$DEFAULT_GATEWAY}
   if is_valid_ip "$THIS_GATEWAY"; then
     break
   else
-    fail "'${THIS_GATEWAY}' is not a valid IPv4 address."
+    fail "'${THIS_GATEWAY}' is not a valid IPv4 address. Please try again."
   fi
 done
 ok "Default gateway: ${BLD}${THIS_GATEWAY}${NC}"
 
 # DNS servers
-echo ""
-echo "  Enter DNS servers for the external network (eth1)."
-echo "  Provide them as a comma-separated list, or press ENTER to skip."
-echo ""
-read -rp "  DNS servers [192.168.1.70,192.168.1.254]: " THIS_DNS
-THIS_DNS=${THIS_DNS:-192.168.1.70,192.168.1.254}
+read -rp "  DNS servers [${DEFAULT_DNS}]: " THIS_DNS
+THIS_DNS=${THIS_DNS:-$DEFAULT_DNS}
 ok "DNS servers: ${BLD}${THIS_DNS}${NC}"
 
 # Search domain
-echo ""
-read -rp "  DNS search domain (e.g., eastcore.local) [none]: " THIS_SEARCH
+read -rp "  DNS search domain [${DEFAULT_SEARCH}]: " THIS_SEARCH
+THIS_SEARCH=${THIS_SEARCH:-$DEFAULT_SEARCH}
 if [[ -n "$THIS_SEARCH" ]]; then
   ok "Search domain: ${BLD}${THIS_SEARCH}${NC}"
 else
@@ -120,30 +141,34 @@ fi
 # ---------- Step 2: Peer nodes (for /etc/hosts) ----------
 section "Step 2 of 4 — Peer Cluster Nodes"
 echo ""
-echo "  Enter the other 2 nodes in the cluster so they can be added to"
-echo "  /etc/hosts. This provides DNS resolution as a fallback in case"
-echo "  your corporate DNS doesn't have A records for the cluster nodes."
+echo "  Confirm the hostname and internal IPs of the other cluster nodes."
+echo "  These will be added to /etc/hosts for static resolution."
 echo ""
 
 PEERS=()
-PEER_COUNT=2
 read -rp "  How many peer nodes? [2]: " PEER_COUNT_INPUT
 PEER_COUNT=${PEER_COUNT_INPUT:-2}
 
 for ((i=0; i<PEER_COUNT; i++)); do
+  # Pull dynamic defaults if they exist
+  default_pname="${DEFAULT_PEER_NAMES[$i]:-kworker}"
+  default_pip="${DEFAULT_PEER_IPS[$i]:-192.168.2.$((86 + i))}"
+
   echo -e "  ${BLD}--- Peer $((i+1)) of $PEER_COUNT ---${NC}"
+  
+  read -rp "    Hostname [${default_pname}]: " pname
+  pname=${pname:-$default_pname}
+  
   while true; do
-    read -rp "    Hostname (e.g., kworkera): " pname
-    [[ -n "$pname" ]] && break
-    fail "Hostname cannot be empty."
-  done
-  while true; do
-    read -rp "    Internal IP:                 " pip
+    read -rp "    Internal IP [${default_pip}]: " pip
+    pip=${pip:-$default_pip}
     is_valid_ip "$pip" && break
-    fail "Invalid IPv4 address."
+    fail "Invalid IPv4 address. Please try again."
   done
+  
   PEERS+=("${pname}:${pip}")
   ok "Peer $((i+1)): ${BLD}${pname}${NC} (${pip})"
+  echo ""
 done
 
 # ---------- Step 3: Netplan ----------
@@ -152,17 +177,21 @@ echo ""
 echo "  The following netplan will be written to /etc/netplan/99-k8s.yaml:"
 echo ""
 
-# Build DNS list as YAML array
+# Build DNS list as a properly indented YAML array
 IFS=',' read -ra DNS_ARRAY <<< "$THIS_DNS"
-DNS_YAML=""
+DNS_LINES=""
 for d in "${DNS_ARRAY[@]}"; do
-  DNS_YAML="${DNS_YAML}          - ${d}
+  DNS_LINES="${DNS_LINES}        - ${d}
 "
 done
 
-SEARCH_LINE=""
+# Build search domain block with correct indentation
 if [[ -n "$THIS_SEARCH" ]]; then
-  SEARCH_LINE="          search: [${THIS_SEARCH}]"
+  SEARCH_BLOCK="      search:
+          - ${THIS_SEARCH}
+"
+else
+  SEARCH_BLOCK=""
 fi
 
 NETPLAN_CONTENT="network:
@@ -172,27 +201,28 @@ NETPLAN_CONTENT="network:
     eth0:
       dhcp4: no
       dhcp6: no
+      optional: true
       addresses:
         - ${THIS_INT_IP}/24
     eth1:
       dhcp4: no
       dhcp6: no
+      optional: true
       addresses:
         - ${THIS_EXT_IP}/24
       routes:
-        - to: 0.0.0.0/0
+        - to: default
           via: ${THIS_GATEWAY}
           metric: 100
       nameservers:
-        addresses:
-${DNS_YAML}${SEARCH_LINE}
-"
+${DNS_LINES}${SEARCH_BLOCK}"
 
 echo -e "${CYN}──── /etc/netplan/99-k8s.yaml ────────────────────────────────${NC}"
 echo "$NETPLAN_CONTENT" | sed 's/^/    /'
 echo -e "${CYN}──────────────────────────────────────────────────────────────${NC}"
 echo ""
 read -rp "  Apply this netplan? [Y/n]: " confirm_netplan
+confirm_netplan=${confirm_netplan:-Y}
 if [[ "$confirm_netplan" =~ ^[nN](o)?$ ]]; then
   warn "Skipping netplan application. You must configure it manually."
   APPLY_NETPLAN=false
@@ -240,7 +270,6 @@ fi
 # ---------- 4b: Cloud-init mask ----------
 echo ""
 echo -e "  ${CYN}→${NC} Masking cloud-init network configuration..."
-echo "    This prevents cloud-init from overwriting the netplan on reboot."
 if ln -sf /dev/null /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg 2>/dev/null; then
   ok "Cloud-init network management disabled"
 else
@@ -300,24 +329,46 @@ echo ""
 echo "  Verifying the new configuration took effect..."
 echo ""
 
-verify_local() {
-  local label="$1"; local expected="$2"; local cmd="$3"
+verify_interface_ip() {
+  local iface="$1"; local expected="$2"
   local actual
-  actual=$(bash -c "$cmd" 2>/dev/null || echo "(error)")
-  if echo "$actual" | grep -qF "$expected"; then
-    ok "$label: $actual"
+  actual=$(ip -4 -o addr show "$iface" 2>/dev/null | awk '/inet/ {print $4}' | cut -d/ -f1 | head -1)
+  if [[ "$actual" == "$expected" ]]; then
+    ok "${iface} IP: $actual"
   else
-    fail "$label: expected '${expected}', got '$actual'"
+    fail "${iface} IP: expected '${expected}', got '$actual'"
   fi
 }
 
-verify_local "eth0 IP"          "$THIS_INT_IP"  "ip -4 -o addr show eth0 | awk '{print \$4}' | cut -d/ -f1"
-verify_local "eth1 IP"          "$THIS_EXT_IP"  "ip -4 -o addr show eth1 | awk '{print \$4}' | cut -d/ -f1"
-verify_local "default route"    "via ${THIS_GATEWAY} dev eth1" "ip route show default | head -1"
-verify_local "rp_filter all"    "1"  "sysctl -n net.ipv4.conf.all.rp_filter"
-verify_local "rp_filter eth0"   "1"  "sysctl -n net.ipv4.conf.eth0.rp_filter"
-verify_local "rp_filter eth1"   "1"  "sysctl -n net.ipv4.conf.eth1.rp_filter"
-verify_local "ip_forward"       "1"  "sysctl -n net.ipv4.ip_forward"
+verify_sysctl() {
+  local key="$1"; local expected="$2"
+  local actual
+  actual=$(sysctl -n "$key" 2>/dev/null)
+  if [[ "$actual" == "$expected" ]]; then
+    ok "${key}: $actual"
+  else
+    fail "${key}: expected '${expected}', got '$actual'"
+  fi
+}
+
+verify_default_route() {
+  local expected_gw="$1"
+  local actual
+  actual=$(ip route show default 2>/dev/null | head -1)
+  if echo "$actual" | grep -qF "via ${expected_gw} dev eth1"; then
+    ok "default route: $actual"
+  else
+    fail "default route: expected 'via ${expected_gw} dev eth1', got '$actual'"
+  fi
+}
+
+verify_interface_ip "eth0" "$THIS_INT_IP"
+verify_interface_ip "eth1" "$THIS_EXT_IP"
+verify_default_route "$THIS_GATEWAY"
+verify_sysctl "net.ipv4.conf.all.rp_filter"  "1"
+verify_sysctl "net.ipv4.conf.eth0.rp_filter" "1"
+verify_sysctl "net.ipv4.conf.eth1.rp_filter" "1"
+verify_sysctl "net.ipv4.ip_forward"          "1"
 
 # Ping test
 if timeout 3 ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; then
@@ -340,13 +391,13 @@ done
 # ---------- Summary ----------
 section "Preparation Complete"
 echo ""
-echo "  ${BLD}Applied on ${THIS_HOSTNAME}:${NC}"
+echo -e "  ${BLD}Applied on ${THIS_HOSTNAME}:${NC}"
 echo "    • Netplan: /etc/netplan/99-k8s.yaml"
 echo "    • Sysctl:  /etc/sysctl.d/99-kubernetes.conf"
 echo "    • Hosts:   $((${#PEERS[@]} + 1)) entries in /etc/hosts"
 echo "    • Cloud-init: network management disabled"
 echo ""
-echo "  ${BLD}Next steps:${NC}"
+echo -e "  ${BLD}Next steps:${NC}"
 echo "    1. Repeat this script on the other 2 nodes with their respective IPs."
 echo "    2. From the control plane, run:  ./verify-network.sh"
 echo ""
