@@ -47,10 +47,20 @@ collect_input() {
   echo "    • Otherwise, enter the path to the SSH private key:"
   echo ""
 
+ # Detect the real user's home directory even if running under sudo
+  local REAL_HOME
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+  else
+    REAL_HOME="$HOME"
+  fi
+
   while true; do
     read -rp "  SSH private key path [~/.ssh/id_rsa]: " SSH_KEY
     SSH_KEY=${SSH_KEY:-~/.ssh/id_rsa}
-    SSH_KEY="${SSH_KEY/#\~/$HOME}"
+
+    # Safely expand ~ or ~/.ssh to the real user's home directory
+    SSH_KEY="${SSH_KEY/#\~/$REAL_HOME}"
 
     if [[ -f "$SSH_KEY" ]]; then
       ok "SSH private key set to: ${BLD}${SSH_KEY}${NC}"
@@ -80,8 +90,8 @@ collect_input() {
   echo ""
 
   while true; do
-    read -rp "  Control plane hostname (e.g., kcontrol) [kcontrol]: " CTRL_NAME
-    CTRL_NAME=${CTRL_NAME:-kcontrol}
+    read -rp "  Control plane hostname (e.g., kcontrolplane) [kcontrolplane]: " CTRL_NAME
+    CTRL_NAME=${CTRL_NAME:-kcontrolplane}
     [[ -n "$CTRL_NAME" ]] && break
     fail "Hostname cannot be empty. Please try again."
   done
@@ -130,7 +140,7 @@ collect_input() {
   done
 
   echo ""
-  echo "  ${BLD}Tip:${NC} Workers are usually named kworkera, kworkerb, etc."
+  echo -e "  ${BLD}Tip:${NC} Workers are usually named kworkera, kworkerb, etc."
   echo "       IPs typically follow the control plane's scheme, with the last"
   echo "       octet incremented (e.g., 192.168.2.86, 192.168.2.87)."
   echo ""
@@ -218,4 +228,3 @@ _build_node_arrays() {
   ALL_EXT_IPS=("$CTRL_EXT_IP" "${WORKER_EXT_IPS[@]}")
   ALL_INT_IPS=("$CTRL_INT_IP" "${WORKER_INT_IPS[@]}")
 }
-

@@ -17,6 +17,18 @@ source "${SCRIPT_DIR}/check-connectivity.sh"
 source "${SCRIPT_DIR}/check-routes.sh"
 source "${SCRIPT_DIR}/check-egress.sh"
 
+# ---------- Elevated Privileges Check ----------
+if [[ $EUID -eq 0 ]]; then
+  echo "This script should NOT be run with sudo or as root."
+  echo ""
+  echo -e  "  ${BLD}Why?${NC}  It uses your regular user's SSH key to connect"
+  echo "         to the other cluster nodes. Running as root causes"
+  echo "         it to look for the key in '/root/.ssh/' instead of"
+  echo "         your home directory."
+  echo ""
+  exit 1
+fi
+
 # ---------- CLI argument parsing ----------
 CHECK_ONLY=""
 LIST_ONLY=false
