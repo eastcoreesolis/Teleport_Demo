@@ -1,0 +1,24 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ${INTERNAL_IFACE}:
+      dhcp4: no
+      dhcp6: no
+      optional: true
+      addresses:
+        - ${THIS_INT_IP}/24
+    ${EXTERNAL_IFACE}:
+      dhcp4: no
+      dhcp6: no
+      optional: true
+      addresses:
+        - ${THIS_EXT_IP}/24
+      routes:
+        - to: default
+          via: ${THIS_GATEWAY}
+          metric: 100
+      nameservers:
+        addresses:
+${DNS_LINES}
+${SEARCH_BLOCK}
