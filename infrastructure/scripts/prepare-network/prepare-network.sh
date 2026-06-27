@@ -44,6 +44,9 @@ echo ""
 auto_detect_role
 detect_iface
 
+export INTERNAL_IFACE
+export EXTERNAL_IFACE
+
 echo ""
 read -rp "  Press ENTER to begin, or Ctrl+C to exit: " _
 echo ""
@@ -51,6 +54,10 @@ echo ""
 # ---------- Step 1 & 2: Collect configuration ----------
 collect_node_config
 collect_peer_nodes
+
+export THIS_INT_IP
+export THIS_EXT_IP
+export THIS_GATEWAY
 
 # ---------- Step 3 & 4: Apply changes ----------
 section "Step 4 of 4 — Apply Changes"
