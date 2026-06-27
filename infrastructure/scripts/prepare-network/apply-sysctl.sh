@@ -21,8 +21,8 @@ apply_sysctls() {
 # Kubernetes networking requirements
 # Reverse-path filtering: 1 (strict) — required for dual-NIC setups with CNIs
 net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.${INTERNAL_IFACE}.rp_filter = 1
-net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter = 1
+net.ipv4.conf.${INTERNAL_IFACE}.rp_filter = 2
+net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter = 2
 
 # IP forwarding: required for pod-to-pod routing across nodes
 net.ipv4.ip_forward = 1

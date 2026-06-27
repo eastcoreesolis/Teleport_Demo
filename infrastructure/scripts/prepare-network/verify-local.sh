@@ -7,7 +7,7 @@
 get_interface_ip() {
   local iface="$1"
   local target_ip="$2"
-  
+
   # Check if the exact expected IP is assigned to this interface
   if ip -4 addr show dev "$iface" 2>/dev/null | grep -qF "inet ${target_ip}/"; then
     echo "$target_ip"
@@ -29,11 +29,11 @@ wait_for_network() {
   while (( waited < 10 )); do
     local int_up=0
     local ext_up=0
-    
+
     # Check if interfaces physically exist and are UP
     ip link show dev "$INTERNAL_IFACE" 2>/dev/null | grep -q "state UP" && int_up=1
     ip link show dev "$EXTERNAL_IFACE" 2>/dev/null | grep -q "state UP" && ext_up=1
-    
+
     if [[ "$int_up" -eq 1 && "$ext_up" -eq 1 ]]; then
       ok "Physical links are UP and active"
       return 0
@@ -80,18 +80,18 @@ verify_local_config() {
 
   # 4. Verify Sysctl settings
   local rp_all rp_int rp_ext ip_fwd
-  
+
   rp_all=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null)
-  [[ "$rp_all" == "1" ]] && ok "net.ipv4.conf.all.rp_filter: $rp_all" || fail "rp_filter all: got '${rp_all:-EMPTY}'"
+  [[ "$rp_all" == "2" ]] && ok "net.ipv4.conf.all.rp_filter: $rp_all" || fail "rp_filter all: expected '2', got '${rp_all:-EMPTY}'"
 
   rp_int=$(sysctl -n "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter" 2>/dev/null)
-  [[ "$rp_int" == "1" ]] && ok "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter: $rp_int" || fail "rp_filter ${INTERNAL_IFACE}: got '${rp_int:-EMPTY}'"
+  [[ "$rp_int" == "2" ]] && ok "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter: $rp_int" || fail "rp_filter ${INTERNAL_IFACE}: expected '2', got '${rp_int:-EMPTY}'"
 
   rp_ext=$(sysctl -n "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter" 2>/dev/null)
-  [[ "$rp_ext" == "1" ]] && ok "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter: $rp_ext" || fail "rp_filter ${EXTERNAL_IFACE}: got '${rp_ext:-EMPTY}'"
+  [[ "$rp_ext" == "2" ]] && ok "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter: $rp_ext" || fail "rp_filter ${EXTERNAL_IFACE}: expected '2', got '${rp_ext:-EMPTY}'"
 
   ip_fwd=$(sysctl -n net.ipv4.ip_forward 2>/dev/null)
-  [[ "$ip_fwd" == "1" ]] && ok "net.ipv4.ip_forward: $ip_fwd" || fail "ip_forward: got '${ip_fwd:-EMPTY}'"
+  [[ "$ip_fwd" == "1" ]] && ok "net.ipv4.ip_forward: $ip_fwd" || fail "ip_forward: expected '1', got '${ip_fwd:-EMPTY}'"
 
   # 5. Egress Ping Check
   if timeout 3 ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; then
