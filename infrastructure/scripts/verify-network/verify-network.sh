@@ -46,7 +46,7 @@ if $LIST_ONLY; then
 fi
 
 # ============================================================================
-#  Function Definitions (Must be defined before they are called below)
+#  Function Definitions
 # ============================================================================
 
 print_summary() {
