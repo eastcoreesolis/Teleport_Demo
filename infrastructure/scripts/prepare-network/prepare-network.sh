@@ -64,7 +64,10 @@ echo ""
 read -rp "  Press ENTER to apply, or Ctrl+C to cancel: " _
 echo ""
 
-apply_netplan && apply_cloud_init_mask && apply_sysctls && apply_hosts
+apply_netplan
+apply_cloud_init_mask
+apply_sysctls
+apply_hosts
 
 # ---------- Verify ----------
 verify_local_config
