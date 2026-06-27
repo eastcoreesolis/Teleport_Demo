@@ -2,8 +2,8 @@
 #
 # kubeadm-install.sh — Main Orchestrator
 # ============================================================================
-#  Installs containerd and Kubernetes components (kubeadm, kubelet, kubectl).
-#  Run this on EACH of the 3 nodes before 'kubeadm init'.
+#  Installs containerd and Kubernetes components on Ubuntu 22.04 LTS.
+#  Run this on EACH of the 3 nodes.
 # ============================================================================
 
 set -euo pipefail
@@ -11,35 +11,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARED_LIB="${SCRIPT_DIR}/../lib"
 
-# ---------- Source shared libraries ----------
+# ---------- Source shared UI utilities ----------
 source "${SHARED_LIB}/ui.sh"
 
-# ---------- Source local modules ----------
+# ---------- Source installation modules ----------
 source "${SCRIPT_DIR}/01-prerequisites.sh"
 source "${SCRIPT_DIR}/02-containerd.sh"
 source "${SCRIPT_DIR}/03-kubetools.sh"
 source "${SCRIPT_DIR}/04-verify-prereqs.sh"
 
-# ---------- Root check ----------
+# ---------- Root Check ----------
 if [[ $EUID -ne 0 ]]; then
   fail "This script must be run as root (use: sudo ./kubeadm-install.sh)"
   exit 1
 fi
 
-# ---------- Welcome ----------
+# ---------- Welcome Banner ----------
 banner
-echo "  This script will install containerd, kubeadm, kubelet, and kubectl."
-echo "  Press ENTER at each prompt to accept the default versions."
+echo -e "  This script will prepare your ${BLD}Ubuntu 22.04${NC} machine and install"
+echo "  containerd, kubeadm, kubelet, and kubectl pinned to stable versions."
+echo ""
+read -rp "  Press ENTER to begin, or Ctrl+C to cancel: " _
 echo ""
 
-# Run all installation phases sequentially
+# Execute installation sequence
 install_prerequisites
 install_containerd
 install_kubetools
 verify_prereqs
 
-# ---------- Summary ----------
-section "Installation Complete"
+# ---------- Completion Summary ----------
+section "System Installation Complete"
 echo ""
 echo -e "  ${BLD}Installed on $(hostname):${NC}"
 echo "    • containerd: configured for systemd cgroup driver"
@@ -47,6 +49,6 @@ echo "    • kubeadm:    ready for cluster bootstrap"
 echo "    • kubelet:    enabled and will start on first init/join"
 echo ""
 echo -e "  ${BLD}Next steps:${NC}"
-echo "    1. Repeat this script on the other 2 nodes."
+echo "    1. Repeat this script on your other cluster nodes."
 echo "    2. From the control plane, run:  sudo kubeadm init ..."
 echo ""
