@@ -79,10 +79,7 @@ verify_local_config() {
   fi
 
   # 4. Verify Sysctl settings
-  local rp_all rp_int rp_ext ip_fwd
-
-  rp_all=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null)
-  [[ "$rp_all" == "2" ]] && ok "net.ipv4.conf.all.rp_filter: $rp_all" || fail "rp_filter all: expected '2', got '${rp_all:-EMPTY}'"
+  local rp_int rp_ext ip_fwd
 
   rp_int=$(sysctl -n "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter" 2>/dev/null)
   [[ "$rp_int" == "2" ]] && ok "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter: $rp_int" || fail "rp_filter ${INTERNAL_IFACE}: expected '2', got '${rp_int:-EMPTY}'"

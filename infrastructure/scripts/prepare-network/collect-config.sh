@@ -50,9 +50,15 @@ collect_node_config() {
   ok "DNS servers: ${BLD}${THIS_DNS}${NC}"
 
   # Search domain
-  read -rp "  DNS search domain [${DEFAULT_SEARCH}]: " THIS_SEARCH
-  THIS_SEARCH=${THIS_SEARCH:-$DEFAULT_SEARCH}
-  ok "Search domain: ${BLD}${THIS_SEARCH:-none}${NC}"
+  echo -e "  Enter your DNS search domain (or press ENTER to leave blank):"
+  read -rp "  DNS search domain: " THIS_SEARCH
+
+  if [[ -z "$THIS_SEARCH" ]]; then
+    THIS_SEARCH=""
+    ok "Search domain: ${BLD}none (blank)${NC}"
+  else
+    ok "Search domain: ${BLD}${THIS_SEARCH}${NC}"
+  fi
 }
 
 collect_peer_nodes() {
