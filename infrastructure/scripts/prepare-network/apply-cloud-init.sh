@@ -4,6 +4,8 @@
 # ============================================================================
 
 apply_cloud_init_mask() {
+
+  section "Step 4.1 of 4.3 — masking cloud-init"
   echo ""
   echo -e "  ${CYN}→${NC} Masking cloud-init network configuration..."
   if ln -sf /dev/null /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg 2>/dev/null; then

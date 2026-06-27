@@ -60,7 +60,6 @@ export THIS_EXT_IP
 export THIS_GATEWAY
 
 # ---------- Step 3 & 4: Apply changes ----------
-section "Step 4 of 4 — Apply Changes"
 echo ""
 echo "  Applying the following changes:"
 echo "    • Netplan configuration (${INTERNAL_IFACE}/${EXTERNAL_IFACE})"

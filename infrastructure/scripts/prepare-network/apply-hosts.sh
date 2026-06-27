@@ -4,6 +4,7 @@
 # ============================================================================
 
 apply_hosts() {
+  section "Step 4.3 of 4.3 - hosts file configuration"
   echo ""
   echo -e "  ${CYN}→${NC} Adding peer node entries to /etc/hosts..."
 

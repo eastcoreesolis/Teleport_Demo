@@ -4,6 +4,7 @@
 # ============================================================================
 
 apply_sysctls() {
+  section "Step 4.2 of 4.3 - sysctl.d configuration"
   echo ""
   echo -e "  ${CYN}→${NC} Loading bridge network kernel modules..."
   # Load br_netfilter so the kernel compiles net.bridge system paths
@@ -34,7 +35,7 @@ SYSCTL_EOF
   ok "Sysctl config written"
 
   echo -e "  ${CYN}→${NC} Applying sysctl values..."
-  
+
   # Direct-apply configuration file
   if sysctl -p /etc/sysctl.d/99-kubernetes.conf >/dev/null 2>&1; then
     # Sync system configuration
