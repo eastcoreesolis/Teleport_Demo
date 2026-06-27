@@ -5,6 +5,15 @@
 
 apply_sysctls() {
   echo ""
+  echo -e "  ${CYN}→${NC} Loading bridge network kernel modules..."
+  # Load br_netfilter so the kernel compiles net.bridge system paths
+  if modprobe br_netfilter 2>/dev/null; then
+    echo "br_netfilter" > /etc/modules-load.d/k8s.conf
+    ok "br_netfilter module loaded and configured to persist on reboot"
+  else
+    warn "Could not load br_netfilter module. If this is a VM, you may need to enable nesting/virtualization."
+  fi
+
   echo -e "  ${CYN}→${NC} Writing /etc/sysctl.d/99-kubernetes.conf..."
 
   cat > /etc/sysctl.d/99-kubernetes.conf <<SYSCTL_EOF
@@ -26,9 +35,9 @@ SYSCTL_EOF
 
   echo -e "  ${CYN}→${NC} Applying sysctl values..."
   
-  # Force-load our specific configuration file first so it overrides system defaults
+  # Direct-apply configuration file
   if sysctl -p /etc/sysctl.d/99-kubernetes.conf >/dev/null 2>&1; then
-    # Also trigger a system-wide sync just in case
+    # Sync system configuration
     sysctl --system >/dev/null 2>&1 || true
     ok "Sysctl values successfully applied and verified"
   else
