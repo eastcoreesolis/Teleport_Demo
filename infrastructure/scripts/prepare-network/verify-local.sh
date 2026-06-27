@@ -3,52 +3,45 @@
 #  Post-apply verification: confirms the configuration took effect.
 # ============================================================================
 
-TMP_IP_FILE=$(mktemp /tmp/verify_ip.XXXXXX)
-TMP_ROUTE_FILE=$(mktemp /tmp/verify_route.XXXXXX)
-
-# Safely query an interface IP using a file redirect instead of pipes
+# Query interface IP using native iproute2 filter matching
 get_interface_ip() {
   local iface="$1"
-  # Use a fresh redirect instead of pipes. Redirects do not trigger SIGPIPE.
-  ip -4 addr show dev "$iface" 2>/dev/null > "$TMP_IP_FILE" || true
-
-  # Process the file
-  awk '/inet / {print $2}' "$TMP_IP_FILE" | cut -d/ -f1 | head -n1
+  local target_ip="$2"
+  
+  # Check if the exact expected IP is assigned to this interface
+  if ip -4 addr show dev "$iface" 2>/dev/null | grep -qF "inet ${target_ip}/"; then
+    echo "$target_ip"
+  else
+    # Fallback: grab whatever IPv4 is there, or return EMPTY
+    local current_ip
+    current_ip=$(ip -4 addr show dev "$iface" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -n1)
+    echo "${current_ip:-EMPTY}"
+  fi
 }
-
-# Safely query the default route using a file redirect
-get_default_route() {
-  ip route show default 2>/dev/null > "$TMP_ROUTE_FILE" || true
-  head -n1 "$TMP_ROUTE_FILE"
-}
-
-# Cleanup on exit
-cleanup_tmp_files() {
-  rm -f "$TMP_IP_FILE" "$TMP_ROUTE_FILE"
-}
-trap cleanup_tmp_files EXIT
 
 wait_for_network() {
   echo ""
-  echo -e "  ${CYN}→${NC} Waiting for network to converge (up to 15 seconds)..."
+  echo -e "  ${CYN}→${NC} Waiting 5 seconds for Netplan changes to apply and links to settle..."
+  sleep 5
 
+  echo -e "  ${CYN}→${NC} Verifying link carrier states..."
   local waited=0
-  local int_ip=""
-  local ext_ip=""
-
-  while (( waited < 15 )); do
-    int_ip=$(get_interface_ip "$INTERNAL_IFACE")
-    ext_ip=$(get_interface_ip "$EXTERNAL_IFACE")
-
-    if [[ -n "$int_ip" && -n "$ext_ip" ]]; then
-      ok "Network interfaces are up (Internal: $int_ip, External: $ext_ip)"
-      sleep 2  # Let routing table settle fully
+  while (( waited < 10 )); do
+    local int_up=0
+    local ext_up=0
+    
+    # Check if interfaces physically exist and are UP
+    ip link show dev "$INTERNAL_IFACE" 2>/dev/null | grep -q "state UP" && int_up=1
+    ip link show dev "$EXTERNAL_IFACE" 2>/dev/null | grep -q "state UP" && ext_up=1
+    
+    if [[ "$int_up" -eq 1 && "$ext_up" -eq 1 ]]; then
+      ok "Physical links are UP and active"
       return 0
     fi
     sleep 1
     ((waited++))
   done
-  warn "Network did not fully converge within 15 seconds. Continuing checks anyway."
+  warn "One or more physical links are not reporting UP. Proceeding anyway..."
 }
 
 verify_local_config() {
@@ -59,26 +52,26 @@ verify_local_config() {
   echo ""
 
   # 1. Verify Internal Interface IP
-  local int_actual=""
-  int_actual=$(get_interface_ip "$INTERNAL_IFACE")
+  local int_actual
+  int_actual=$(get_interface_ip "$INTERNAL_IFACE" "$THIS_INT_IP")
   if [[ "$int_actual" == "$THIS_INT_IP" ]]; then
     ok "${INTERNAL_IFACE} IP: $int_actual"
   else
-    fail "${INTERNAL_IFACE} IP: expected '${THIS_INT_IP}', got '${int_actual:-EMPTY}'"
+    fail "${INTERNAL_IFACE} IP: expected '${THIS_INT_IP}', got '${int_actual}'"
   fi
 
   # 2. Verify External Interface IP
-  local ext_actual=""
-  ext_actual=$(get_interface_ip "$EXTERNAL_IFACE")
+  local ext_actual
+  ext_actual=$(get_interface_ip "$EXTERNAL_IFACE" "$THIS_EXT_IP")
   if [[ "$ext_actual" == "$THIS_EXT_IP" ]]; then
     ok "${EXTERNAL_IFACE} IP: $ext_actual"
   else
-    fail "${EXTERNAL_IFACE} IP: expected '${THIS_EXT_IP}', got '${ext_actual:-EMPTY}'"
+    fail "${EXTERNAL_IFACE} IP: expected '${THIS_EXT_IP}', got '${ext_actual}'"
   fi
 
   # 3. Verify Default Route
-  local route_actual=""
-  route_actual=$(get_default_route)
+  local route_actual
+  route_actual=$(ip route show default 2>/dev/null | head -n1)
   if echo "$route_actual" | grep -qF "via ${THIS_GATEWAY} dev ${EXTERNAL_IFACE}"; then
     ok "default route: $route_actual"
   else
@@ -86,18 +79,18 @@ verify_local_config() {
   fi
 
   # 4. Verify Sysctl settings
-  local rp_all="" rp_int="" rp_ext="" ip_fwd=""
-
-  rp_all=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null || echo "0")
+  local rp_all rp_int rp_ext ip_fwd
+  
+  rp_all=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null)
   [[ "$rp_all" == "1" ]] && ok "net.ipv4.conf.all.rp_filter: $rp_all" || fail "rp_filter all: got '${rp_all:-EMPTY}'"
 
-  rp_int=$(sysctl -n "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter" 2>/dev/null || echo "0")
+  rp_int=$(sysctl -n "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter" 2>/dev/null)
   [[ "$rp_int" == "1" ]] && ok "net.ipv4.conf.${INTERNAL_IFACE}.rp_filter: $rp_int" || fail "rp_filter ${INTERNAL_IFACE}: got '${rp_int:-EMPTY}'"
 
-  rp_ext=$(sysctl -n "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter" 2>/dev/null || echo "0")
+  rp_ext=$(sysctl -n "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter" 2>/dev/null)
   [[ "$rp_ext" == "1" ]] && ok "net.ipv4.conf.${EXTERNAL_IFACE}.rp_filter: $rp_ext" || fail "rp_filter ${EXTERNAL_IFACE}: got '${rp_ext:-EMPTY}'"
 
-  ip_fwd=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
+  ip_fwd=$(sysctl -n net.ipv4.ip_forward 2>/dev/null)
   [[ "$ip_fwd" == "1" ]] && ok "net.ipv4.ip_forward: $ip_fwd" || fail "ip_forward: got '${ip_fwd:-EMPTY}'"
 
   # 5. Egress Ping Check

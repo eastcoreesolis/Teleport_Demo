@@ -77,7 +77,17 @@ apply_sysctls
 apply_hosts
 
 # ---------- Verify ----------
+#verify_local_config
+
+set +e
+set +o pipefail
+
 verify_local_config
+
+# Restore strict checks
+set -e
+set -o pipefail
+
 
 # ---------- Summary ----------
 section "Preparation Complete"
