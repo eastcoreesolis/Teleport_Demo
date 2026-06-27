@@ -48,44 +48,53 @@ Ensure your hypervisor network routing matches the following structural pattern:
           │ (eth0)                  │ (eth0)                  │ (eth0)
           └─────────────────────────┴─────────────────────────┘
                [ Isolated Private Cluster Network (192.168.2.0/24) ]
+```
 
-
+---
 
 ## 4. Operating System Configuration Requirements
 
-Static IP Target Table
+### Static IP Target Table
 
-Using the table below as a guide, during VM operating system installation, configure the network interfaces statically or let DHCP assign them temporarily.
+Using the table below as a guide, during VM operating system installation, configure the network interfaces statically or let the `prepare-network.sh` script guide you to a static configuration matching the layout shown below.
 
-(the prepare-network.sh script will guide you to a static configuration as shown below):
+| Hostname       | eth0 IP (Internal) | eth1 IP (External) | Default Gateway (eth1) |
+|----------------|-------------------|-------------------|------------------------|
+| `kcontrolplane` | `192.168.2.85/24` | `192.168.1.85/24` | `192.168.1.254` (or your local gateway) |
+| `kworkera`      | `192.168.2.86/24` | `192.168.1.86/24` | `192.168.1.254` (or your local gateway) |
+| `kworkerb`      | `192.168.2.87/24` | `192.168.1.87/24` | `192.168.1.254` (or your local gateway) |
 
-Hostname	eth0 IP (Internal)	eth1 IP (External)	Default Gateway (on eth1)
-kcontrolplane	192.168.2.85/24		192.168.1.85/24		192.168.1.254 	(or your local GW)
-kworkera	192.168.2.86/24		192.168.1.86/24		192.168.1.254 	(or your local GW)
-kworkerb	192.168.2.87/24		192.168.1.87/24		192.168.1.254 	(or your local GW)
+### Operating System Configuration Requirements
 
-Operating System Configuration Requirements
 During the Ubuntu installation wizard, enforce the following settings:
 
-System Hostnames: Use kcontrolplane, kworkera, and kworkerb precisely (all-lowercase)
-Administrative User: Create a primary administrator account with root privileges (e.g., username admin).
-SSH Server: Enable the OpenSSH Server during installation. Do not install any snap packages (like MicroK8s or Docker).
-Clean Root Access: Ensure your user is added to the sudoers file with passwordless escalation or standard password authorization.
+- **System Hostnames:** Use `kcontrolplane`, `kworkera`, and `kworkerb` precisely (all lowercase).
+- **Administrative User:** Create a primary administrator account with root privileges (for example, `admin`).
+- **SSH Server:** Enable the OpenSSH Server during installation. Do not install any snap packages such as MicroK8s or Docker.
+- **Clean Root Access:** Ensure your user account is added to the sudoers file with either passwordless escalation or standard password authorization.
 
-## 5. Post-Provisiong Checklist
+---
 
-Before running the automated script suites, ensure you complete the following manual steps:
+## 5. Post-Provisioning Checklist
 
-A. Establish SSH Keys
-From your local workstation or the control plane node, generate an SSH key pair and copy your public key to all nodes to enable seamless, passwordless verification loops:
+Before running the automated script suites, ensure you complete the following manual steps.
 
+### A. Establish SSH Keys
+
+From your local workstation or the control plane node, generate an SSH key pair and copy the public key to all cluster nodes to enable passwordless administrative access:
+
+```bash
 ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+
 ssh-copy-id <userID>@192.168.1.85
-ssh-copy-id <userID>esolis@192.168.1.86
+ssh-copy-id <userID>@192.168.1.86
 ssh-copy-id <userID>@192.168.1.87
+```
 
-B. Clone the Repository
-Clone your project directory onto each of the three nodes in the user's home directory:
+### B. Clone the Repository
 
+Clone the project repository onto each of the three nodes in the user's home directory:
+
+```bash
 git clone https://github.com/eastcoreesolis/Teleport_Demo.git ~/Teleport_Demo
-
+```
