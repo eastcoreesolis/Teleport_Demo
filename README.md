@@ -393,7 +393,7 @@ kubectl get certificate -n nginx-app
 **Positive Test (Allowed Actions):**
 
 ```bash
-kubectl config use-context nginx-deployer-context
+kubectl config use-context nginx-deployer
 kubectl get pods -n nginx-app
 kubectl scale deployment nginx-deployment -n nginx-app --replicas=3
 kubectl get pods -n nginx-app
