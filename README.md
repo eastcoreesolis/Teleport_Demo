@@ -17,25 +17,26 @@ ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
 
 #### 2. Copy the keys to all nodes (external IPs) to authorize passwordless SSH
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<control node internal ip addr>
+ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<control node external ip addr>
 ```
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<worker node x internal ip addr>
+ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<worker node x external ip addr>
 ```
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<worker node x internal ip addr>
+ssh-copy-id -i ~/.ssh/id_ed25519 esolis@<worker node x external ip addr>
 ```
+
+### All Nodes Step 1
 
 #### 3. Ensure the git repository is cloned into your home directory on all three nodes
-#### (Run this on kcontrol, kworker1, and kworker2)
 
 ```bash
 git clone https://github.com/your-username/Teleport_Demo.git ~/Teleport_Demo
 ```
 
-### All Nodes Step 1
+### All Nodes Step 2
 
 #### 1. Run the prepare-network.sh script on all nodes
 
@@ -59,7 +60,7 @@ cd ~/Teleport_Demo/infrastructure/scripts
 sudo ./verify-network/verify-network.sh
 ```
 
-### All Nodes Step 2
+### All Nodes Step 3
 
 #### 1. Run the kubeadm-install.sh script on all nodes
 
@@ -68,7 +69,7 @@ cd ~/Teleport_Demo/infrastructure/scripts
 ```
 
 ```bash
-sudo ./verify-network/kubeadm-install.sh
+sudo ./kubeadm-install/kubeadm-install.sh
 ```
 
 ### Control Plane Step 3
@@ -91,7 +92,7 @@ cd ~/Teleport_Demo/infrastructure/scripts
 ```
 
 ```bash
-sudo ./verify-network/bootstrap-control-plane.sh
+sudo ./kubeadm-install/bootstrap-control-plane.sh
 ```
 
 ```bash
