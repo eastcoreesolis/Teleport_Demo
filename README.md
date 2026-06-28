@@ -406,7 +406,7 @@ kubectl scale deployment nginx-deployment -n nginx-app --replicas=2
 kubectl config use-context kubernetes-admin@kubernetes
 kubectl create namespace forbidden-ns
 
-kubectl config use-context nginx-deployer-context
+kubectl config use-context nginx-deployer
 kubectl run sneaky-pod --image=nginx -n forbidden-ns
 # Expected: Error from server (Forbidden): pods is forbidden
 ```
