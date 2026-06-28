@@ -562,4 +562,56 @@ kubectl rollout restart statefulset argocd-application-controller -n argocd
 
 **Expected Result:** The `nginx-app` application will transition from `OutOfSync` to `Synced` and `Healthy`. This confirms ArgoCD has successfully read the Git repository, pulled the manifests, and deployed them into the `nginx-app` namespace.
 
+
+### Appendix A: Natural UI Access via Ingress (Bare-Metal/Dual-NIC)
+
+In environments with strict dual-NIC isolation, accessing services like ArgoCD via random high-port `NodePorts` is cumbersome. You can configure a natural, clean URL mapping (e.g., `https://argocd.local`) by patching the Ingress Controller to bind directly to your host's network interface on port `80` and `443`.
+
+#### A.1. Deploy & Patch the NGINX Ingress Controller
+Deploy the bare-metal ingress controller and patch its spec to map ports directly to its scheduling node:
+
+```bash
+# 1. Install the controller (Idempotent)
+if ! kubectl get namespace ingress-nginx > /dev/null 2>&1; then
+  echo "Installing NGINX Ingress Controller..."
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/baremetal/deploy.yaml
+else
+  echo "NGINX Ingress Controller is already installed. Skipping installation."
+fi
+
+# 2. Wait for the pod to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=120s
+
+# 3. Patch the deployment to bind to host port 80/443
+kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type json -p '[
+  {"op": "add", "path": "/spec/template/spec/hostNetwork", "value": true}
+]'
+```
+
+#### A.2. Map Domain Names to the Scheduling Node IP
+Because the controller runs inside the cluster, it will schedule on a specific host node (often a worker node like `kworkera` instead of the control plane). 
+
+1. **Identify the Scheduling Node IP:**
+   Identify which physical node is running the controller pod:
+   ```bash
+   kubectl get pods -n ingress-nginx -o wide
+   ```
+   *Note the IP address listed under the `IP` column (e.g., `192.168.2.86`). This is your target routing IP.*
+
+2. **Update the Workstation's Hosts File:**
+   On your **local workstation** (physical computer), map this target IP to your local domain routes. 
+   *   **Linux/macOS:** Edit `/etc/hosts` with `sudo nano /etc/hosts`
+   *   **Windows:** Edit `C:\Windows\System32\drivers\etc\hosts` with administrative privileges
+
+   Add the following lines, replacing `<target-node-ip>` with the IP you found in step 1:
+   ```text
+   <target-node-ip> argocd.local
+   <target-node-ip> nginx.local
+   ```
+
+#### A.3. Access the Web UIs
+Navigate directly to **`https://argocd.local`** or **`https://nginx.local`** in your local browser. 
+
+**Note:** Because the certificates are self-signed by `cert-manager`, you will receive a standard browser privacy warning. Click "Advanced" and "Proceed anyway" to access the dashboard. All traffic is now routed securely on standard web ports (`80`/`443`) through the host-network gateway!
+
 ---
