@@ -421,32 +421,20 @@ kubectl get secrets -n nginx-app
 # Expected: Error from server (Forbidden)
 ```
 
-## 11. Control Plane: GitOps Preparation
+### 11. Control Plane: GitOps Preparation
 
-### 11.1. Create the GitOps Folder Structure
+Because you cloned the repository, the GitOps structure, the RBAC template, and the ArgoCD `Application` manifest (`03-argocd-app.yaml`) **already exist** in the `gitops/argocd/apps/` directory. 
 
-```bash
-mkdir -p ~/Teleport_Demo/gitops/argocd/apps
-```
+The only variable you need to update before applying the manifest is the `repoURL`. You must change the placeholder to your actual GitHub repository URL.
 
-### 11.2. Generate Declarative Manifests
-
-Export the current running state of the namespace, RBAC, and workloads into YAML files. Use the `--show-managed-fields=false` flag to strip the dynamic fields that cause `resourceVersion` conflicts.
+#### 11.1. Update the GitOps Repository URL
+Open the existing ArgoCD Application manifest and replace `<your-github-username>` with your actual GitHub username:
 
 ```bash
-# Namespace
-kubectl get namespace nginx-app -o yaml --show-managed-fields=false > ~/Teleport_Demo/gitops/argocd/apps/00-namespace.yaml
-
-# RBAC
-kubectl get role,rolebinding -n nginx-app -o yaml --show-managed-fields=false > ~/Teleport_Demo/gitops/argocd/apps/01-rbac.yaml
-
-# Workloads
-kubectl get deployment,service,ingress -n nginx-app -o yaml --show-managed-fields=false > ~/Teleport_Demo/gitops/argocd/apps/02-workloads.yaml
+nano ~/Teleport_Demo/gitops/argocd/apps/03-argocd-app.yaml
 ```
 
-### 11.3. Create the ArgoCD Application Manifest
-
-Create the file `~/Teleport_Demo/gitops/argocd/apps/03-argocd-app.yaml` and paste the following content:
+Update the `repoURL` field to your repository:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -471,13 +459,21 @@ spec:
       - CreateNamespace=true
 ```
 
-## 12. Control Plane: ArgoCD Installation
+---
 
-### 12.1. Install ArgoCD
+### 12. Control Plane: ArgoCD Installation
+
+#### 12.1. Install ArgoCD (Idempotent)
+The `install.yaml` is large. We will only run the installation if the `argocd` namespace does not already exist. 
 
 ```bash
-kubectl create namespace argocd
-kubectl create -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.11.0/manifests/install.yaml || kubectl replace -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.11.0/manifests/install.yaml
+if ! kubectl get namespace argocd > /dev/null 2>&1; then
+  echo "Installing ArgoCD..."
+  kubectl create namespace argocd
+  kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.11.0/manifests/install.yaml
+else
+  echo "ArgoCD is already installed. Skipping installation."
+fi
 ```
 
 Wait for the core components to come online (up to 3 minutes):
@@ -486,8 +482,7 @@ Wait for the core components to come online (up to 3 minutes):
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=180s
 ```
 
-### 12.2. Fix CoreDNS to Reach the Internet (GitHub)
-
+#### 12.2. Fix CoreDNS to Reach the Internet (GitHub)
 Because the cluster uses strict dual-NIC isolation, CoreDNS cannot forward queries to the upstream resolvers. You must manually configure CoreDNS to use public DNS servers directly. This is required for ArgoCD to resolve `github.com`.
 
 ```bash
@@ -496,7 +491,7 @@ kubectl edit configmap coredns -n kube-system
 
 Find the `forward . /etc/resolv.conf` block and replace it with:
 
-```yaml
+```text
         forward . 8.8.8.8 1.1.1.1 {
            prefer_udp
            max_concurrent 1000
@@ -510,19 +505,18 @@ kubectl rollout restart deployment coredns -n kube-system
 kubectl rollout status deployment coredns -n kube-system
 ```
 
-### 12.3. Expose the ArgoCD Web UI
-
-Change the ArgoCD server service to `NodePort` to access it via the control plane's external IP:
+#### 12.3. Expose the ArgoCD Web UI
+Change the ArgoCD server service to `NodePort` to access it via the control plane's external IP. (This will skip the patch if it has already been applied):
 
 ```bash
-kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort"}}'
+kubectl patch svc argocd-server -n argocd --type merge -p '{"spec": {"type": "NodePort"}}'
 ```
 
 Get the dynamically assigned NodePort:
 
 ```bash
 ARGOCD_PORT=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.spec.ports[0].nodePort}')
-echo "ArgoCD UI is available at: https://192.168.1.25:${ARGOCD_PORT}"
+echo "ArgoCD UI is available at: https://<control plane internal ip address>:${ARGOCD_PORT}"
 ```
 
 Get the initial admin password:
@@ -532,7 +526,8 @@ ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpa
 echo "ArgoCD Login Password: ${ARGOCD_PASS}"
 ```
 
-### 12.4. Register the GitOps Application
+#### 12.4. Register the GitOps Application
+This command tells ArgoCD to start watching your local `gitops/argocd/apps/` folder in GitHub. 
 
 ```bash
 kubectl apply -f ~/Teleport_Demo/gitops/argocd/apps/03-argocd-app.yaml
@@ -544,11 +539,10 @@ Watch the sync happen:
 kubectl get application -n argocd -w
 ```
 
-### 12.4.1. Configure Ingress Health Override (Bare-Metal Only)
+#### 12.4.1. Configure Ingress Health Override (Bare-Metal Only)
+In bare-metal or sandbox environments, your Ingress resources may not be assigned an external load-balancer IP address automatically. By default, ArgoCD will mark these Ingresses as `Progressing` indefinitely. 
 
-In bare-metal or sandbox environments, your Ingress resources may not be assigned an external load-balancer IP address automatically. By default, ArgoCD will mark these Ingresses as `Progressing` indefinitely.
-
-To force ArgoCD to evaluate these Ingresses as `Healthy`, apply the following health check override customization:
+We will use a `kubectl patch` command to add the health check override idempotently, completely replacing the need to use a text editor (which can fail on WSL copy-paste).
 
 ```bash
 kubectl patch configmap argocd-cm -n argocd --type merge -p '
@@ -568,76 +562,4 @@ kubectl rollout restart statefulset argocd-application-controller -n argocd
 
 **Expected Result:** The `nginx-app` application will transition from `OutOfSync` to `Synced` and `Healthy`. This confirms ArgoCD has successfully read the Git repository, pulled the manifests, and deployed them into the `nginx-app` namespace.
 
-## 13. Validate the GitOps Loop
-
-### 13.1. Modify a Manifest in Git
-
-Edit `~/Teleport_Demo/gitops/argocd/apps/02-workloads.yaml` and change the `replicas: 2` line to `replicas: 3`.
-
-### 13.2. Commit and Push
-
-```bash
-cd ~/Teleport_Demo
-git add .
-git commit -m "feat: scale nginx deployment to 3 replicas via gitops"
-git push origin main
-```
-
-### 13.3. Observe the Automatic Sync
-
-Within a few minutes, ArgoCD will detect the change and scale the deployment to 3 pods. Verify with:
-
-```bash
-kubectl get pods -n nginx-app
-```
-
-## Appendix A: Natural UI Access via Ingress (Bare-Metal/Dual-NIC)
-
-In environments with strict dual-NIC isolation, accessing services like ArgoCD via random high-port `NodePorts` is cumbersome. You can configure a natural, clean URL mapping (e.g., `https://argocd.local`) by patching the Ingress Controller to bind directly to your host's network interface on port `80` and `443`.
-
-### A.1. Deploy & Patch the NGINX Ingress Controller
-Deploy the bare-metal ingress controller and patch its spec to map ports directly to its scheduling node:
-
-Install the controller
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/baremetal/deploy.yaml
-```
-
-Wait for the pod to be ready
-
-```bash
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=120s
-```
-
-Patch the deployment to bind to host port 80/443
-
-```bash
-kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type json -p '[
-  {"op": "add", "path": "/spec/template/spec/hostNetwork", "value": true}
-]'
-```
-
-Map Domain Names to the Scheduling Node IP
-
-Because the controller runs inside the cluster, it will schedule on a specific host node (often a worker node like kworkera instead of the control plane).
-
-Identify which physical node is running the controller pod:
-
-```bash
-kubectl get pods -n ingress-nginx -o wide
-```
-
-On your local workstation (physical computer), map this target IP to your local domain routes in your hosts file (/etc/hosts on Linux/macOS, or C:\Windows\System32\drivers\etc\hosts on Windows):
-
-```text
-<target-node-ip> argocd.local
-<target-node-ip> nginx.local
-```
-
-Navigate directly to https://argocd.local or https://nginx.local in your browser. 
-All traffic is now routed securely on standard web ports (80/443) through the host-network gateway.
-
-
-READMEEOF
-```
+---
