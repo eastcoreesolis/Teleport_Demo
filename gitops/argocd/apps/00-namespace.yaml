@@ -1,14 +1,9 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  creationTimestamp: "2026-06-28T12:03:33Z"
   labels:
     kubernetes.io/metadata.name: nginx-app
   name: nginx-app
-  resourceVersion: "53529"
-  uid: 4922397b-d57b-4e75-b93c-35dbd2921303
 spec:
   finalizers:
   - kubernetes
-status:
-  phase: Active

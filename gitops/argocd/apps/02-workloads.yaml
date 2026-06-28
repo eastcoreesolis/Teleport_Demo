@@ -129,4 +129,3 @@ items:
     loadBalancer: {}
 kind: List
 metadata:
-  resourceVersion: ""

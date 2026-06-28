@@ -84,4 +84,3 @@ items:
     name: nginx-deployer
 kind: List
 metadata:
-  resourceVersion: ""
