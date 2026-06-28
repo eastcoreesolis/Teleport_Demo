@@ -82,7 +82,7 @@ sudo ./kubeadm-install/kubeadm-install.sh
 sudo kubeadm init \
   --apiserver-advertise-address=<control-plane-internal-ip> \
   --pod-network-cidr=192.168.0.0/16 \
-  --node-name=kcontrol
+  --node-name=<control-plane-hostname>
 ```
 
 ### 7.2. Bootstrap the Control Plane
