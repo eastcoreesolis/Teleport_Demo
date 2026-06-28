@@ -1,6 +1,6 @@
 # kubeadm-install/05-install-calico.sh
 # ============================================================================
-#  Phase 5 of 5: Install Calico CNI (v3.27.3) pinned to internal interface (eth0)
+#  Install Calico CNI (v3.27.3) pinned to internal interface (eth0)
 # ============================================================================
 
 source "${SCRIPT_DIR}/lib/version-pinning.sh"
@@ -71,6 +71,8 @@ EOF
   echo -e "  ${CYN}→${NC} Deploying Calico custom resources..."
   kubectl apply -f "$custom_res_file" >/dev/null
   ok "Calico CNI resources applied"
+
+  sleep 10
 
   # ---------- 5. Active Wait for Running State ----------
   echo -e "  ${CYN}→${NC} Waiting for Calico system namespace to initialize..."
