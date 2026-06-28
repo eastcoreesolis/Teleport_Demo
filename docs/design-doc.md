@@ -1,4 +1,3 @@
-```markdown
 # Architecture & Design Document: Secure GitOps Sandbox
 
 This document outlines the architectural decisions, networking topologies, security configurations, and failure mode analysis for the 3-node secure Kubernetes cluster.
