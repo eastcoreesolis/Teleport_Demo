@@ -17,7 +17,7 @@ items:
     uid: ed0c88ed-9039-438b-8604-89528a364da2
   spec:
     progressDeadlineSeconds: 600
-    replicas: 2
+    replicas: 10
     revisionHistoryLimit: 10
     selector:
       matchLabels:
