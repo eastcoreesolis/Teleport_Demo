@@ -569,5 +569,54 @@ Within a few minutes, ArgoCD will detect the change and scale the deployment to 
 ```bash
 kubectl get pods -n nginx-app
 ```
+
+## Appendix A: Natural UI Access via Ingress (Bare-Metal/Dual-NIC)
+
+In environments with strict dual-NIC isolation, accessing services like ArgoCD via random high-port `NodePorts` is cumbersome. You can configure a natural, clean URL mapping (e.g., `https://argocd.local`) by patching the Ingress Controller to bind directly to your host's network interface on port `80` and `443`.
+
+### A.1. Deploy & Patch the NGINX Ingress Controller
+Deploy the bare-metal ingress controller and patch its spec to map ports directly to its scheduling node:
+
+Install the controller
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/baremetal/deploy.yaml
+```
+
+Wait for the pod to be ready
+
+```bash
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=120s
+```
+
+Patch the deployment to bind to host port 80/443
+
+```bash
+kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type json -p '[
+  {"op": "add", "path": "/spec/template/spec/hostNetwork", "value": true}
+]'
+```
+
+Map Domain Names to the Scheduling Node IP
+
+Because the controller runs inside the cluster, it will schedule on a specific host node (often a worker node like kworkera instead of the control plane).
+
+Identify which physical node is running the controller pod:
+
+```bash
+kubectl get pods -n ingress-nginx -o wide
+```
+
+On your local workstation (physical computer), map this target IP to your local domain routes in your hosts file (/etc/hosts on Linux/macOS, or C:\Windows\System32\drivers\etc\hosts on Windows):
+
+```text
+<target-node-ip> argocd.local
+<target-node-ip> nginx.local
+```
+
+Navigate directly to https://argocd.local or https://nginx.local in your browser. 
+All traffic is now routed securely on standard web ports (80/443) through the host-network gateway.
+
+
 READMEEOF
 ```
