@@ -1,86 +1,26 @@
-apiVersion: v1
-items:
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: Role
-  metadata:
-    annotations:
-      kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role","metadata":{"annotations":{},"name":"nginx-deployer-role","namespace":"nginx-app"},"rules":[{"apiGroups":["apps",""],"resources":["deployments","services","pods","configmaps"],"verbs":["get","list","watch","create","update","patch","delete"]},{"apiGroups":["networking.k8s.io"],"resources":["ingresses"],"verbs":["get","list","watch","create","update","patch","delete"]}]}
-    creationTimestamp: "2026-06-28T12:03:33Z"
-    name: nginx-deployer-role
-    namespace: nginx-app
-    resourceVersion: "59777"
-    uid: 07039028-b728-4e22-8d5f-18a5c9500ec8
-  rules:
-  - apiGroups:
-    - apps
-    - ""
-    resources:
-    - deployments
-    - services
-    - pods
-    - configmaps
-    verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete
-  - apiGroups:
-    - networking.k8s.io
-    resources:
-    - ingresses
-    verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete
-  - apiGroups:
-    - apps
-    resources:
-    - deployments/scale
-    verbs:
-    - get
-    - update
-    - patch
-  - apiGroups:
-    - ""
-    resources:
-    - secrets
-    verbs:
-    - get
-    - list
-  - apiGroups:
-    - networking.k8s.io
-    resources:
-    - ingresses/status
-    verbs:
-    - get
-    - update
-    - patch
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: RoleBinding
-  metadata:
-    annotations:
-      kubectl.kubernetes.io/last-applied-configuration: |
-        {"apiVersion":"rbac.authorization.k8s.io/v1","kind":"RoleBinding","metadata":{"annotations":{},"name":"nginx-deployer-binding","namespace":"nginx-app"},"roleRef":{"apiGroup":"rbac.authorization.k8s.io","kind":"Role","name":"nginx-deployer-role"},"subjects":[{"apiGroup":"rbac.authorization.k8s.io","kind":"User","name":"nginx-deployer"}]}
-    creationTimestamp: "2026-06-28T12:03:33Z"
-    name: nginx-deployer-binding
-    namespace: nginx-app
-    resourceVersion: "53533"
-    uid: bec5037f-4ecc-4ec8-8c70-49cd956aa779
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: Role
-    name: nginx-deployer-role
-  subjects:
-  - apiGroup: rbac.authorization.k8s.io
-    kind: User
-    name: nginx-deployer
-kind: List
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
 metadata:
+  name: nginx-deployer-role
+  namespace: nginx-app
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nginx-deployer-binding
+  namespace: nginx-app
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: nginx-app
+roleRef:
+  kind: Role
+  name: nginx-deployer-role
+  apiGroup: rbac.authorization.k8s.io
