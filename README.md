@@ -58,10 +58,11 @@ sudo ./prepare-network/prepare-network.sh
 ### 5.1. Verify Network Isolation and Routing
 
 Run the verification script to ensure the node can reach both the external and pod networks.
+**do not run as root**
 
 ```bash
 cd ~/Teleport_Demo/infrastructure/scripts
-sudo ./verify-network/verify-network.sh
+./verify-network/verify-network.sh
 ```
 
 ## 6. All Nodes: Kubernetes Installation
