@@ -48,11 +48,11 @@ metadata:
   name: nginx-ingress
   namespace: nginx-app
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: selfsigned-issuer
 spec:
   ingressClassName: nginx
   rules:
-  - host: nginx.eastcore.io
+  - host: nginx.local
     http:
       paths:
       - path: /
@@ -64,5 +64,5 @@ spec:
               number: 80
   tls:
   - hosts:
-    - nginx.eastcore.io
+    - nginx.local
     secretName: nginx-tls
