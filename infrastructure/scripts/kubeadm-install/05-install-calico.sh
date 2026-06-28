@@ -14,9 +14,9 @@ install_calico() {
 
   # ---------- 1. Apply Tigera Operator ----------
   echo -e "  ${CYN}→${NC} Applying Tigera Operator manifest..."
-  
+
   local operator_url="https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests/tigera-operator.yaml"
-  
+
   # Use kubectl create first to bypass the annotation size limits. If it exists, use replace.
   if ! kubectl create -f "$operator_url" >/dev/null 2>&1; then
     kubectl replace -f "$operator_url" >/dev/null 2>&1 || true
@@ -25,7 +25,7 @@ install_calico() {
 
   # ---------- 2. Wait for the CRDs to be registered ----------
   echo -e "  ${CYN}→${NC} Waiting for 'Installation' CRD to register..."
-  
+
   local waited=0
   while (( waited < 30 )); do
     if kubectl get crd installations.operator.tigera.io >/dev/null 2>&1; then
@@ -72,20 +72,25 @@ EOF
   kubectl apply -f "$custom_res_file" >/dev/null
   ok "Calico CNI resources applied"
 
-  # ---------- 5. Active Wait for Running State (Shielded against pipefail) ----------
+  # ---------- 5. Active Wait for Running State ----------
   echo -e "  ${CYN}→${NC} Waiting for Calico system namespace to initialize..."
-  
+
   local ns_waited=0
+  local ns_exists=false
   while (( ns_waited < 15 )); do
-    if kubectl get ns calico-system >/dev/null 2>&1; then
-      break
+    if kubectl get ns calico-system >/dev/null 2>&1 || [ $? -ne 0 ]; then
+      # Double check if it actually exists to bypass any false positives
+      if kubectl get ns calico-system >/dev/null 2>&1; then
+        ns_exists=true
+        break
+      fi
     fi
     sleep 2
     ((ns_waited++))
   done
 
   echo -e "  ${CYN}→${NC} Waiting for Calico system pods to initialize (up to 180 seconds)..."
-  
+
   local pod_waited=0
   while (( pod_waited < 60 )); do
     # Read state inside a subshell where errors are locally ignored to protect parent set -e
