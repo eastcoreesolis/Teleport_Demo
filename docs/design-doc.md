@@ -114,7 +114,7 @@ The application configuration state is completely declarative and controlled via
 | **Worker Node Loss** | Pods scheduled on the lost node go offline. | Kubernetes automatically reschedules deployment replicas to the remaining worker node. |
 | **Ingress Controller Failure** | External domain access (`argocd.local`, `nginx.local`) drops. | Running the Ingress deployment with host-network port binding allows simple node-port recovery and local DNS target redirection. |
 | **Git Repository Offline** | ArgoCD cannot synchronize new commits. | The cluster continues running the last applied state with zero downtime. Local state is drift-protected via self-healing once the repo recovers. |
-```
 
----
+
+
 
