@@ -47,8 +47,6 @@ kind: Ingress
 metadata:
   name: nginx-ingress
   namespace: nginx-app
-  annotations:
-    cert-manager.io/cluster-issuer: selfsigned-issuer
 spec:
   ingressClassName: nginx
   rules:
