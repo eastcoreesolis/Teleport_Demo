@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://192.168.1.159:3000/esolis/Teleport_Demo.git
+    repoURL: https://github.com/eastcoreesolis/Teleport_Demo.git
     targetRevision: main
     path: gitops/argocd/apps
   destination:
