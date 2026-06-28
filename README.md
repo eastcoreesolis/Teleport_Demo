@@ -292,11 +292,17 @@ kubectl config use-context nginx-deployer-context
 Apply the manifests:
 
 ```bash
-cat <<EOF | kubectl apply -f -
+nano ~/nginx-workload.yaml
+```
+
+Copy the text below, paste it directly into your nano screen, then save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`):
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment
+  namespace: nginx-app
   labels:
     app: nginx
 spec:
@@ -319,6 +325,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx-service
+  namespace: nginx-app
 spec:
   selector:
     app: nginx
@@ -332,9 +339,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nginx-ingress
+  namespace: nginx-app
   annotations:
     cert-manager.io/cluster-issuer: selfsigned-issuer
 spec:
+  ingressClassName: nginx
   rules:
   - host: nginx.local
     http:
@@ -350,7 +359,18 @@ spec:
   - hosts:
     - nginx.local
     secretName: nginx-tls-secret
-EOF
+```
+
+Apply the file
+
+```bash
+kubectl apply -f ~/nginx-workload.yaml
+```
+
+Remove the file
+
+```bash
+rm ~/nginx-workload.yaml
 ```
 
 ### 10.9. Verify the Workload
