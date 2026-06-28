@@ -523,6 +523,28 @@ Watch the sync happen:
 kubectl get application -n argocd -w
 ```
 
+### 12.4.1. Configure Ingress Health Override (Bare-Metal Only)
+
+In bare-metal or sandbox environments, your Ingress resources may not be assigned an external load-balancer IP address automatically. By default, ArgoCD will mark these Ingresses as `Progressing` indefinitely.
+
+To force ArgoCD to evaluate these Ingresses as `Healthy`, apply the following health check override customization:
+
+```bash
+kubectl patch configmap argocd-cm -n argocd --type merge -p '
+{
+  "data": {
+    "resource.customizations.health.networking.k8s.io_Ingress": "hs = {}\nhs.status = \"Healthy\"\nhs.message = \"Ingress is OK\"\nreturn hs"
+  }
+}
+'
+```
+
+Restart the controller to apply the change:
+
+```bash
+kubectl rollout restart statefulset argocd-application-controller -n argocd
+```
+
 **Expected Result:** The `nginx-app` application will transition from `OutOfSync` to `Synced` and `Healthy`. This confirms ArgoCD has successfully read the Git repository, pulled the manifests, and deployed them into the `nginx-app` namespace.
 
 ## 13. Validate the GitOps Loop
