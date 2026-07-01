@@ -31,7 +31,7 @@ data:
           <h1>Teleport Demo — Live Static Web Site</h1>
           <p>Deployed declaratively via <strong>GitOps</strong> using ArgoCD.</p>
           <p>Security Status: <span class="badge">Cert-Manager TLS Secured</span></p>
-          <p style="color: #666; font-size: 0.9em;">Release version: 1.0.0</p>
+          <p style="color: #666; font-size: 0.9em;">Release version: 1.1.0</p>
         </div>
       </body>
     </html>
