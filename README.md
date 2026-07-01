@@ -39,7 +39,7 @@ ssh-copy-id -i ~/.ssh/id_ed25519 <username>@<worker-2-external-ip>
 Ensure the repository is cloned into your home directory on all three nodes.
 
 ```bash
-git clone https://github.com/<your-github-username>/Teleport_Demo.git ~/Teleport_Demo
+git clone https://github.com/eastcoreesolis/Teleport_Demo.git ~/Teleport_Demo
 ```
 
 ## 4. All Nodes: Network Preparation
