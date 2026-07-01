@@ -297,7 +297,9 @@ kubectl config set-context nginx-deployer-context \
   --namespace=nginx-app
 ```
 
-### 10.8. Deploy the Nginx Application
+### 10.8. Deploy the Nginx Application 
+**This step can skipped if using Argocd.**
+If using Argocd, procced to steps 11 and 12, and then return to Step 10.9 to complete the exercise.
 
 Switch to the restricted user context:
 
