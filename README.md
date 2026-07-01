@@ -122,9 +122,11 @@ sudo kubeadm join <control-plane-internal-ip>:6443 \
 
 Configure kube on the kcontrolplane as your regular user
 
+```bash
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
 
 Ensure all nodes are `Ready`.
 
