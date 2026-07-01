@@ -47,6 +47,8 @@ kind: Ingress
 metadata:
   name: nginx-ingress
   namespace: nginx-app
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-issuer
 spec:
   ingressClassName: nginx
   rules:
@@ -60,3 +62,7 @@ spec:
             name: nginx-service
             port:
               number: 80
+  tls:
+  - hosts:
+    - nginx.local
+    secretName: nginx-tls-secret
