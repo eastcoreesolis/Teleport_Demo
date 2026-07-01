@@ -120,6 +120,12 @@ sudo kubeadm join <control-plane-internal-ip>:6443 \
 
 ### 9.1. Verify Node Status
 
+Configure kube on the kcontrolplane as your regular user
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
 Ensure all nodes are `Ready`.
 
 ```bash
