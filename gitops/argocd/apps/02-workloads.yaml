@@ -1,3 +1,43 @@
+# 1. Namespace Definition (Matches the namespace file)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nginx-app
+  labels:
+    app: nginx
+
+---
+# 2. Versioned Static Content (ConfigMap)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-html
+  namespace: nginx-app
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Teleport Demo</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; margin-top: 100px; background-color: #f4f6f9; color: #333; }
+          .container { border: 1px solid #ccc; padding: 40px; border-radius: 8px; display: inline-block; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          h1 { color: #1a73e8; }
+          .badge { background: #34a853; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Teleport Demo — Live Static Web Site</h1>
+          <p>Deployed declaratively via <strong>GitOps</strong> using ArgoCD.</p>
+          <p>Security Status: <span class="badge">Cert-Manager TLS Secured</span></p>
+          <p style="color: #666; font-size: 0.9em;">Release version: 1.0.0</p>
+        </div>
+      </body>
+    </html>
+
+---
+# 3. Workload Deployment with ConfigMap Mounted
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +57,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:latest
+        image: nginx:1.25.3  # Pinned robust version
         ports:
         - containerPort: 80
         resources:
@@ -27,7 +67,16 @@ spec:
           limits:
             cpu: "500m"
             memory: "256Mi"
+        volumeMounts:
+        - name: html-volume
+          mountPath: /usr/share/nginx/html  # Overwrites default NGINX directory
+      volumes:
+      - name: html-volume
+        configMap:
+          name: nginx-html
+
 ---
+# 4. Service definition
 apiVersion: v1
 kind: Service
 metadata:
@@ -41,7 +90,9 @@ spec:
     port: 80
     targetPort: 80
   type: ClusterIP
+
 ---
+# 5. Ingress Rule with TLS and Cert-Manager Annotations
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -49,7 +100,6 @@ metadata:
   namespace: nginx-app
   annotations:
     cert-manager.io/cluster-issuer: selfsigned-issuer
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
