@@ -17,8 +17,8 @@ metadata:
   name: nginx-deployer-binding
   namespace: nginx-app
 subjects:
-- kind: ServiceAccount
-  name: default
+- kind: User
+  name: nginx-deployer
   namespace: nginx-app
 roleRef:
   kind: Role
