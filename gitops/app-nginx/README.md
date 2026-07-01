@@ -1,4 +1,4 @@
-# Phase 2: Nginx Application Deployment
+Nginx Application Deployment
 
 This directory contains the manifests for the static Nginx web application, deployed using a Certificate Signing Request (CSR) based identity.
 
