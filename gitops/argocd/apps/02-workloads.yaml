@@ -49,6 +49,7 @@ metadata:
   namespace: nginx-app
   annotations:
     cert-manager.io/cluster-issuer: selfsigned-issuer
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
