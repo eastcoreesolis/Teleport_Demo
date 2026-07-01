@@ -148,13 +148,21 @@ Deploy two test pods on different worker nodes and verify they can ping each oth
 
 ```bash
 kubectl run network-test-1 --image=alpine --overrides='{"spec": {"nodeName": "<worker-1-hostname>"}}' -- sh -c "sleep 3600"
+```
 
+```bash
 kubectl run network-test-2 --image=alpine --overrides='{"spec": {"nodeName": "<worker-2-hostname>"}}' -- sh -c "sleep 3600"
+```
 
+```bash
 POD2_IP=$(kubectl get pod network-test-2 -o jsonpath='{.status.podIP}')
+```
 
+```bash
 echo "Target Pod IP on worker-2: $POD2_IP"
+```
 
+```bash
 kubectl exec network-test-1 -- ping -c 3 "$POD2_IP"
 ```
 
