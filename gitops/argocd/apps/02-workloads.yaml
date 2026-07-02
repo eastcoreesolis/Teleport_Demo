@@ -102,11 +102,6 @@ metadata:
     cert-manager.io/cluster-issuer: selfsigned-issuer
 spec:
   ingressClassName: nginx
-  defaultBackend:
-    service:
-      name: nginx-service
-      port:
-        number: 80
   rules:
   - host: nginx.local
     http:
