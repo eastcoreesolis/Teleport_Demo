@@ -51,8 +51,8 @@ The cluster consists of three nodes utilizing a dual-network interface card (NIC
 
 Strict network isolation is enforced through two distinct physical/virtual interfaces on all nodes:
 
-1.  **`eth0` (External Network):** Reserved strictly for out-of-band management, SSH access, and initial cluster provisioning. No cluster control plane communication (e.g., `etcd`, `kube-apiserver` traffic) is exposed on this interface.
-2.  **`eth1` (Internal Cluster Network):** Used exclusively for node-to-node routing, Kubernetes API server advertisements, overlay pod traffic (via Calico), and internal service discovery.
+1.  **`eth1` (External Network):** Reserved strictly for out-of-band management, SSH access, and initial cluster provisioning. No cluster control plane communication (e.g., `etcd`, `kube-apiserver` traffic) is exposed on this interface.
+2.  **`eth0` (Internal Cluster Network):** Used exclusively for node-to-node routing, Kubernetes API server advertisements, overlay pod traffic (via Calico), and internal service discovery.
 
 ### IP Forwarding and Calico CNI
 *   **Routing Integrity:** `prepare-network.sh` configures static interface routes ensuring that cluster traffic never leaks to the public `eth0` interface.
