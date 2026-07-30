@@ -1,4 +1,4 @@
-# Teleport Demo: Installation Guide
+# Installation Guide
 
 This guide walks you through setting up a 3-node Kubernetes cluster, configuring strict RBAC, and bootstrapping a full GitOps workflow with ArgoCD.
 
